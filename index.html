@@ -133,13 +133,14 @@
             background-color: #eee;
             border: 2px solid #ddd;
             cursor: pointer;
-            transition: background-color 0.2s, width 0.2s, border-radius 0.2s;
+            transition: width 0.2s, border-radius 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             color: #888;
             font-size: 24px;
+            overflow: hidden;
         }
         .beat.playing {
             border-color: #333 !important;
@@ -246,8 +247,8 @@
         <h3>📖 Wie wird gespielt?</h3>
         <ol>
             <li><strong>Wähle eine Farbe</strong> und ein <strong>Instrument</strong> aus.</li>
-            <li><strong>Wähle die Notenlänge:</strong> Negra (1 Kreis), Blanca (2 Kreise) oder Redonda (4 Kreise).</li>
-            <li><strong>Tippe auf die grauen Kreise</strong>, um deine Noten zu malen.</li>
+            <li><strong>Wähle die Notenlänge:</strong> Achtel (♫ - 2 Töne), Viertel (1 Kreis), Halbe (2 Kreise) oder Ganze (4 Kreise).</li>
+            <li><strong>Tippe auf die grauen Kreise</strong>, um deine Noten zu malen. <em>(Tipp: Klicke bei Achtelnoten auf die linke oder rechte Seite des Kreises, um verschiedene Farben zu mischen!)</em></li>
             <li>Klicke auf den <strong>▶️ Play</strong> Button, um dein Musikstück anzuhören.</li>
         </ol>
     </div>
@@ -264,9 +265,10 @@
             
             <div class="control-group">
                 <span>Notenlänge: </span>
-                <button class="time-btn active" id="btnDur1" onclick="setDuration(1)">♩ Viertel Note (1)</button>
-                <button class="time-btn" id="btnDur2" onclick="setDuration(2)">d Halbe Note (2)</button>
-                <button class="time-btn" id="btnDur4" onclick="setDuration(4)">o Ganze Note (4)</button>
+                <button class="time-btn" id="btnDur05" onclick="setDuration(0.5)">♫ Achtel (0.5)</button>
+                <button class="time-btn active" id="btnDur1" onclick="setDuration(1)">♩ Viertel (1)</button>
+                <button class="time-btn" id="btnDur2" onclick="setDuration(2)">d Halbe (2)</button>
+                <button class="time-btn" id="btnDur4" onclick="setDuration(4)">o Ganze (4)</button>
             </div>
 
             <div class="control-group">
@@ -355,6 +357,7 @@
 
         function setDuration(dur) {
             selectedDuration = dur;
+            document.getElementById('btnDur05').classList.toggle('active', dur === 0.5);
             document.getElementById('btnDur1').classList.toggle('active', dur === 1);
             document.getElementById('btnDur2').classList.toggle('active', dur === 2);
             document.getElementById('btnDur4').classList.toggle('active', dur === 4);
@@ -375,10 +378,10 @@
                 
                 if (newBeats === 3 && oldBeats === 4) {
                     if (beats.length === 4) {
-                        if (parseInt(beats[0].dataset.duration) === 4) {
+                        if (parseFloat(beats[0].dataset.duration) === 4) {
                             beats.forEach(b => resetBeatVisuals(b));
                         }
-                        else if (parseInt(beats[2].dataset.duration) === 2) {
+                        else if (parseFloat(beats[2].dataset.duration) === 2) {
                             resetBeatVisuals(beats[2]);
                             resetBeatVisuals(beats[3]);
                         }
@@ -395,8 +398,9 @@
             const beatEl = document.createElement('div');
             beatEl.className = 'beat';
             beatEl.dataset.noteIndex = "null";
+            beatEl.dataset.noteIndex2 = "null";
             beatEl.dataset.duration = "1";
-            beatEl.onclick = () => toggleBeat(beatEl);
+            beatEl.onclick = (e) => toggleBeat(beatEl, e);
             return beatEl;
         }
 
@@ -441,82 +445,150 @@
 
         function resetBeatVisuals(beat) {
             beat.dataset.noteIndex = "null";
+            beat.dataset.noteIndex2 = "null";
             beat.dataset.duration = "1";
-            beat.style.backgroundColor = '#eee';
+            beat.style.background = '#eee';
             beat.style.border = "2px solid #ddd";
             beat.style.width = "70px"; 
             beat.style.borderRadius = "50%";
             beat.style.display = "flex"; 
-            beat.textContent = "";
+            beat.innerHTML = "";
         }
 
-        function toggleBeat(beatEl) {
+        function updateCorcheaVisuals(beatEl) {
+            const n1 = notes.find(n => n.id === beatEl.dataset.noteIndex);
+            const n2 = notes.find(n => n.id === beatEl.dataset.noteIndex2);
+            
+            const c1 = n1 ? n1.color : '#eee';
+            const c2 = n2 ? n2.color : '#eee';
+
+            beatEl.style.background = `linear-gradient(90deg, ${c1} 50%, ${c2} 50%)`;
+            beatEl.style.border = "2px dashed #555";
+            
+            // Ya no pintamos la corchea, solo la flecha si es C2
+            const text1 = n1 ? (n1.id === 'C2' ? '⬆' : '') : '';
+            const text2 = n2 ? (n2.id === 'C2' ? '⬆' : '') : '';
+            
+            beatEl.innerHTML = `
+                <div style="flex:1; height:100%; display:flex; align-items:center; justify-content:center; border-right:2px dashed rgba(0,0,0,0.15);">${text1}</div>
+                <div style="flex:1; height:100%; display:flex; align-items:center; justify-content:center;">${text2}</div>
+            `;
+            beatEl.style.color = "rgba(0,0,0,0.5)";
+        }
+
+        function toggleBeat(beatEl, event) {
             const measure = beatEl.parentElement;
             const beats = Array.from(measure.querySelectorAll('.beat'));
             const index = beats.indexOf(beatEl);
 
-            const currentDur = parseInt(beatEl.dataset.duration) || 1;
-            if (beatEl.dataset.noteIndex === selectedNote.id && currentDur === selectedDuration) {
-                for(let i=0; i<currentDur; i++) {
-                    if(index + i < beats.length) resetBeatVisuals(beats[index + i]);
-                }
+            const currentDur = parseFloat(beatEl.dataset.duration) || 1;
+            const currentNote1 = beatEl.dataset.noteIndex;
+            const currentNote2 = beatEl.dataset.noteIndex2;
+
+            // Detectar en qué mitad del círculo se hizo clic
+            let isLeft = true;
+            if (event && event.clientX) {
+                const rect = beatEl.getBoundingClientRect();
+                isLeft = (event.clientX - rect.left) < (rect.width / 2);
+            }
+
+            const spacesNeeded = selectedDuration < 1 ? 1 : selectedDuration;
+
+            // Verificar si hay espacio para notas largas
+            if (index + spacesNeeded - 1 >= beats.length) {
+                if (selectedDuration === 4) alert("Für eine (Ganze Note) brauchst du 4 freie Kreise in einer Reihe!");
+                else if (selectedDuration === 2) alert("Für eine (Halbe Note) brauchst du 2 freie Kreise!");
                 return;
             }
 
-            if (index + selectedDuration - 1 >= beats.length) {
-                if (selectedDuration === 4) {
-                    alert("Für eine (Ganze Note) brauchst du 4 freie Kreise in einer Reihe!");
+            // GESTIÓN DE CORCHEAS AISLADA (Para evitar que la propia celda se borre)
+            if (selectedDuration === 0.5 && currentDur === 0.5) {
+                let newNote1 = currentNote1;
+                let newNote2 = currentNote2;
+
+                if (isLeft) {
+                    newNote1 = (currentNote1 === selectedNote.id) ? "null" : selectedNote.id;
                 } else {
-                    alert("Für eine (Halbe Note) brauchst du 2 freie Kreise!");
+                    newNote2 = (currentNote2 === selectedNote.id) ? "null" : selectedNote.id;
+                }
+
+                if (newNote1 === "null" && newNote2 === "null") {
+                    resetBeatVisuals(beatEl);
+                } else {
+                    beatEl.dataset.noteIndex = newNote1;
+                    beatEl.dataset.noteIndex2 = newNote2;
+                    beatEl.dataset.duration = "0.5";
+                    updateCorcheaVisuals(beatEl);
+                    playSound(selectedNote.freq, 0.5);
+                }
+                return; 
+            } 
+            
+            // Lógica para apagar nota entera
+            if (selectedDuration !== 0.5 && currentDur === selectedDuration && currentNote1 === selectedNote.id) {
+                for(let i = 0; i < spacesNeeded; i++) {
+                    resetBeatVisuals(beats[index + i]);
                 }
                 return;
             }
 
+            // Limpiar colisiones de espacios adyacentes para notas largas
             for(let i=0; i<beats.length; i++) {
-                let d = parseInt(beats[i].dataset.duration) || 1;
+                let d = parseFloat(beats[i].dataset.duration) || 1;
+                let spaces = d < 1 ? 1 : d;
                 let noteStart = i;
-                let noteEnd = i + d - 1;
+                let noteEnd = i + spaces - 1;
                 let targetStart = index;
-                let targetEnd = index + selectedDuration - 1;
+                let targetEnd = index + spacesNeeded - 1;
                 
                 if (noteStart <= targetEnd && noteEnd >= targetStart) {
-                    for(let j=0; j<d; j++) {
+                    for(let j=0; j<spaces; j++) {
                         if(i+j < beats.length) resetBeatVisuals(beats[i+j]);
                     }
                 }
             }
 
-            beatEl.dataset.noteIndex = selectedNote.id;
-            beatEl.dataset.duration = selectedDuration.toString();
-            beatEl.style.backgroundColor = selectedNote.color;
-            beatEl.textContent = selectedNote.id === 'C2' ? '⬆' : '';
-            beatEl.style.color = "rgba(0,0,0,0.5)";
+            // APLICAR NUEVA NOTA
+            if (selectedDuration === 0.5) {
+                // Si estaba vacía o era larga, la convertimos
+                beatEl.dataset.noteIndex = selectedNote.id;
+                beatEl.dataset.noteIndex2 = selectedNote.id;
+                beatEl.dataset.duration = "0.5";
+                updateCorcheaVisuals(beatEl);
+                playSound(selectedNote.freq, 0.5);
+            } else {
+                beatEl.dataset.noteIndex = selectedNote.id;
+                beatEl.dataset.noteIndex2 = "null";
+                beatEl.dataset.duration = selectedDuration.toString();
+                beatEl.style.background = selectedNote.color;
+                beatEl.innerHTML = selectedNote.id === 'C2' ? '⬆' : '';
+                beatEl.style.color = "rgba(0,0,0,0.5)";
 
-            if (selectedDuration === 1) {
-                beatEl.style.border = "2px solid #ddd";
-            } 
-            else if (selectedDuration === 2) {
-                beatEl.style.border = "2px solid #555"; 
-                beatEl.style.width = "150px"; 
-                beatEl.style.borderRadius = "35px";
-                
-                beats[index+1].dataset.noteIndex = "tie";
-                beats[index+1].style.display = "none";
+                if (selectedDuration === 1) {
+                    beatEl.style.border = "2px solid #ddd";
+                } 
+                else if (selectedDuration === 2) {
+                    beatEl.style.border = "2px solid #555"; 
+                    beatEl.style.width = "150px"; 
+                    beatEl.style.borderRadius = "35px";
+                    
+                    beats[index+1].dataset.noteIndex = "tie";
+                    beats[index+1].style.display = "none";
+                }
+                else if (selectedDuration === 4) {
+                    beatEl.style.border = "2px solid #555"; 
+                    beatEl.style.width = "310px"; 
+                    beatEl.style.borderRadius = "35px";
+                    
+                    beats[index+1].dataset.noteIndex = "tie";
+                    beats[index+1].style.display = "none";
+                    beats[index+2].dataset.noteIndex = "tie";
+                    beats[index+2].style.display = "none";
+                    beats[index+3].dataset.noteIndex = "tie";
+                    beats[index+3].style.display = "none";
+                }
+                playSound(selectedNote.freq, selectedDuration);
             }
-            else if (selectedDuration === 4) {
-                beatEl.style.border = "2px solid #555"; 
-                beatEl.style.width = "310px"; 
-                beatEl.style.borderRadius = "35px";
-                
-                beats[index+1].dataset.noteIndex = "tie";
-                beats[index+1].style.display = "none";
-                beats[index+2].dataset.noteIndex = "tie";
-                beats[index+2].style.display = "none";
-                beats[index+3].dataset.noteIndex = "tie";
-                beats[index+3].style.display = "none";
-            }
-
-            playSound(selectedNote.freq, selectedDuration);
         }
 
         function clearGrid() {
@@ -571,19 +643,36 @@
                     break; 
                 }
                 const beat = beats[i];
-                
                 if (beat.style.display === "none") continue;
 
                 beat.classList.add('playing');
                 const noteId = beat.dataset.noteIndex;
-                const dur = parseInt(beat.dataset.duration) || 1;
+                const dur = parseFloat(beat.dataset.duration) || 1;
 
-                if (noteId !== "null" && noteId !== "tie") {
-                    const note = notes.find(n => n.id === noteId);
-                    if (note) playSound(note.freq, dur);
+                if (dur === 0.5) {
+                    const noteId2 = beat.dataset.noteIndex2;
+                    const note1 = notes.find(n => n.id === noteId);
+                    const note2 = notes.find(n => n.id === noteId2);
+
+                    if (note1) playSound(note1.freq, 0.45);
+                    await new Promise(r => setTimeout(r, beatDuration * 0.5));
+                    
+                    if (!isPlaying) {
+                        beat.classList.remove('playing');
+                        break;
+                    }
+                    
+                    if (note2) playSound(note2.freq, 0.45);
+                    await new Promise(r => setTimeout(r, beatDuration * 0.5));
+
+                } else {
+                    if (noteId !== "null" && noteId !== "tie") {
+                        const note = notes.find(n => n.id === noteId);
+                        if (note) playSound(note.freq, dur);
+                    }
+                    await new Promise(r => setTimeout(r, beatDuration * dur));
                 }
                 
-                await new Promise(r => setTimeout(r, beatDuration * dur));
                 beat.classList.remove('playing');
             }
             isPlaying = false;
@@ -675,7 +764,6 @@
                 circle.style.color = 'rgba(0,0,0,0.5)';
                 circle.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
                 
-                // Muestra la letra normalmente, pero le añade la flecha explícita al C2
                 circle.textContent = note.id === 'C2' ? 'C ⬆' : note.name;
                 
                 container.appendChild(circle);
@@ -703,11 +791,13 @@
             beats.forEach(beat => {
                 currentPattern.push({
                     id: beat.dataset.noteIndex,
+                    id2: beat.dataset.noteIndex2 || "null",
                     dur: beat.dataset.duration || 1
                 });
             });
 
-            if (currentPattern.every(note => note.id === "null")) {
+            // Evitar guardar si está todo vacío
+            if (currentPattern.every(note => note.id === "null" && (note.id2 === "null" || note.id2 === undefined))) {
                 alert("Das Raster ist leer. Zeichne zuerst ein paar Noten!");
                 return;
             }
@@ -790,17 +880,21 @@
                     const noteData = melodyToLoad.pattern[i];
                     
                     const noteId = typeof noteData === 'string' ? noteData : noteData.id;
-                    const dur = typeof noteData === 'string' ? 1 : parseInt(noteData.dur);
+                    const noteId2 = typeof noteData === 'string' ? noteData : (noteData.id2 || "null");
+                    const dur = typeof noteData === 'string' ? 1 : parseFloat(noteData.dur);
 
                     beat.dataset.noteIndex = noteId;
+                    beat.dataset.noteIndex2 = noteId2;
                     beat.dataset.duration = dur;
 
                     if (noteId === "tie") {
                         beat.style.display = "none";
+                    } else if (dur === 0.5) {
+                        updateCorcheaVisuals(beat);
                     } else if (noteId !== "null") {
                         const note = notes.find(n => n.id === noteId);
-                        beat.style.backgroundColor = note.color;
-                        beat.textContent = noteId === 'C2' ? '⬆' : '';
+                        beat.style.background = note.color;
+                        beat.innerHTML = noteId === 'C2' ? '⬆' : '';
                         beat.style.color = "rgba(0,0,0,0.5)";
 
                         if (dur === 4) {
