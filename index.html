@@ -180,7 +180,7 @@
         .row-remove { color: #f44336; border-color: #f44336; }
         .row-remove:hover { background-color: #f44336; color: white; }
 
-        .controls { margin: 20px 0 30px 0; max-width: 800px; margin-left: auto; margin-right: auto; }
+        .controls { margin: 20px 0 30px 0; max-width: 900px; margin-left: auto; margin-right: auto; }
         button.action-btn {
             font-size: 16px;
             padding: 12px 20px;
@@ -200,6 +200,10 @@
         .save-btn:hover { background-color: #0b7dda; }
         .image-btn { background-color: #9c27b0; }
         .image-btn:hover { background-color: #7b1fa2; }
+        .export-btn { background-color: #ff9800; }
+        .export-btn:hover { background-color: #e68a00; }
+        .import-btn { background-color: #607d8b; }
+        .import-btn:hover { background-color: #455a64; }
 
         .folder-container {
             background-color: white;
@@ -286,6 +290,11 @@
         <br><br>
         <button class="action-btn save-btn" id="saveBtn">💾 In Ordner speichern</button>
         <button class="action-btn image-btn" id="imageBtn">📥 Herunterladen (2 Spalten)</button>
+        <br><br>
+        <!-- Nuevos botones de importación/exportación -->
+        <button class="action-btn export-btn" id="exportBtn">📤 Als Datei speichern</button>
+        <button class="action-btn import-btn" id="importBtn">📂 Datei laden</button>
+        <input type="file" id="fileInput" accept=".json" style="display: none;">
     </div>
 
     <div class="folder-container">
@@ -341,6 +350,11 @@
             document.getElementById('clearBtn').onclick = clearGrid;
             document.getElementById('saveBtn').onclick = saveCurrentMelody;
             document.getElementById('imageBtn').onclick = herunterladen;
+            
+            // Eventos para importar y exportar archivos
+            document.getElementById('exportBtn').onclick = exportToFile;
+            document.getElementById('importBtn').onclick = () => document.getElementById('fileInput').click();
+            document.getElementById('fileInput').addEventListener('change', importFromFile);
 
             renderFolder();
         }
@@ -681,7 +695,6 @@
             cloneContainer.style.top = '-9999px';
             cloneContainer.style.width = 'max-content'; 
             
-            // Re-añadiendo la lógica de las dos columnas para la foto
             const clonedGrid = cloneContainer.querySelector('.grid');
             clonedGrid.style.display = 'grid';
             clonedGrid.style.gridTemplateColumns = 'auto auto'; 
@@ -708,6 +721,118 @@
                 alert("Beim Erstellen des Bildes ist ein Fehler aufgetreten.");
                 if (document.body.contains(cloneContainer)) document.body.removeChild(cloneContainer);
                 btn.textContent = originalText;
+            });
+        }
+
+        function exportToFile() {
+            const beats = document.querySelectorAll('.beat');
+            let currentPattern = [];
+            beats.forEach(beat => {
+                currentPattern.push({
+                    id: beat.dataset.noteIndex,
+                    id2: beat.dataset.noteIndex2 || "null",
+                    dur: beat.dataset.duration || 1
+                });
+            });
+
+            if (currentPattern.every(note => note.id === "null" && (note.id2 === "null" || note.id2 === undefined))) {
+                alert("Das Raster ist leer. Zeichne zuerst ein paar Noten!");
+                return;
+            }
+
+            const melodyData = {
+                pattern: currentPattern,
+                beats: beatsPerMeasure
+            };
+
+            const dataStr = JSON.stringify(melodyData);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "Meine_Melodie.json";
+            a.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
+        function importFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data && data.pattern) {
+                        applyMelodyToGrid(data);
+                    } else {
+                        alert("Ungültiges Dateiformat!");
+                    }
+                } catch (err) {
+                    alert("Fehler beim Lesen der Datei!");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset para poder cargar el mismo archivo si es necesario
+        }
+
+        function applyMelodyToGrid(melodyToLoad) {
+            if (isPlaying) togglePlay(); 
+            
+            const targetBeats = melodyToLoad.beats || 4;
+            setBeatsPerMeasure(targetBeats);
+
+            const requiredMeasures = Math.ceil(melodyToLoad.pattern.length / targetBeats);
+
+            const gridEl = document.getElementById('grid');
+            gridEl.innerHTML = ''; 
+            
+            for (let i = 0; i < requiredMeasures; i++) {
+                gridEl.appendChild(createMeasure());
+            }
+
+            const beats = document.querySelectorAll('.beat');
+            beats.forEach((beat, i) => {
+                if (i < melodyToLoad.pattern.length) {
+                    const noteData = melodyToLoad.pattern[i];
+                    
+                    const noteId = typeof noteData === 'string' ? noteData : noteData.id;
+                    const noteId2 = typeof noteData === 'string' ? noteData : (noteData.id2 || "null");
+                    const dur = typeof noteData === 'string' ? 1 : parseFloat(noteData.dur);
+
+                    beat.dataset.noteIndex = noteId;
+                    beat.dataset.noteIndex2 = noteId2;
+                    beat.dataset.duration = dur;
+
+                    if (noteId === "tie") {
+                        beat.style.display = "none";
+                    } else if (dur === 0.5) {
+                        updateCorcheaVisuals(beat);
+                    } else if (noteId !== "null") {
+                        const note = notes.find(n => n.id === noteId);
+                        if(note) {
+                            beat.style.background = note.color;
+                            beat.innerHTML = noteId === 'C2' ? '⬆' : '';
+                            beat.style.color = "rgba(0,0,0,0.5)";
+
+                            if (dur === 4) {
+                                beat.style.width = "310px";
+                                beat.style.borderRadius = "35px";
+                                beat.style.border = "2px solid #555";
+                            } else if (dur === 2) {
+                                beat.style.width = "150px";
+                                beat.style.borderRadius = "35px";
+                                beat.style.border = "2px solid #555";
+                            } else {
+                                beat.style.border = "2px solid #ddd";
+                            }
+                        }
+                    } else {
+                        resetBeatVisuals(beat);
+                    }
+                }
             });
         }
 
@@ -784,60 +909,7 @@
         }
 
         function loadMelody(index) {
-            if (isPlaying) togglePlay(); 
-            const melodyToLoad = savedMelodies[index];
-            
-            const targetBeats = melodyToLoad.beats || 4;
-            setBeatsPerMeasure(targetBeats);
-
-            const requiredMeasures = Math.ceil(melodyToLoad.pattern.length / targetBeats);
-
-            const gridEl = document.getElementById('grid');
-            gridEl.innerHTML = ''; 
-            
-            for (let i = 0; i < requiredMeasures; i++) {
-                gridEl.appendChild(createMeasure());
-            }
-
-            const beats = document.querySelectorAll('.beat');
-            beats.forEach((beat, i) => {
-                if (i < melodyToLoad.pattern.length) {
-                    const noteData = melodyToLoad.pattern[i];
-                    
-                    const noteId = typeof noteData === 'string' ? noteData : noteData.id;
-                    const noteId2 = typeof noteData === 'string' ? noteData : (noteData.id2 || "null");
-                    const dur = typeof noteData === 'string' ? 1 : parseFloat(noteData.dur);
-
-                    beat.dataset.noteIndex = noteId;
-                    beat.dataset.noteIndex2 = noteId2;
-                    beat.dataset.duration = dur;
-
-                    if (noteId === "tie") {
-                        beat.style.display = "none";
-                    } else if (dur === 0.5) {
-                        updateCorcheaVisuals(beat);
-                    } else if (noteId !== "null") {
-                        const note = notes.find(n => n.id === noteId);
-                        beat.style.background = note.color;
-                        beat.innerHTML = noteId === 'C2' ? '⬆' : '';
-                        beat.style.color = "rgba(0,0,0,0.5)";
-
-                        if (dur === 4) {
-                            beat.style.width = "310px";
-                            beat.style.borderRadius = "35px";
-                            beat.style.border = "2px solid #555";
-                        } else if (dur === 2) {
-                            beat.style.width = "150px";
-                            beat.style.borderRadius = "35px";
-                            beat.style.border = "2px solid #555";
-                        } else {
-                            beat.style.border = "2px solid #ddd";
-                        }
-                    } else {
-                        resetBeatVisuals(beat);
-                    }
-                }
-            });
+            applyMelodyToGrid(savedMelodies[index]);
         }
 
         function deleteMelody(index) {
