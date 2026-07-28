@@ -200,8 +200,6 @@
         .save-btn:hover { background-color: #0b7dda; }
         .image-btn { background-color: #9c27b0; }
         .image-btn:hover { background-color: #7b1fa2; }
-        .colors-btn { background-color: #e91e63; }
-        .colors-btn:hover { background-color: #c2185b; }
 
         .folder-container {
             background-color: white;
@@ -287,8 +285,7 @@
         <button class="action-btn clear-btn" id="clearBtn">🧹 Alles löschen</button>
         <br><br>
         <button class="action-btn save-btn" id="saveBtn">💾 In Ordner speichern</button>
-        <button class="action-btn image-btn" id="imageBtn">📸 Foto (2 Spalten)</button>
-        <button class="action-btn colors-btn" id="downloadColorsBtn">🎨 Farbskala</button>
+        <button class="action-btn image-btn" id="imageBtn">📥 Herunterladen</button>
     </div>
 
     <div class="folder-container">
@@ -343,8 +340,7 @@
             document.getElementById('playBtn').onclick = togglePlay;
             document.getElementById('clearBtn').onclick = clearGrid;
             document.getElementById('saveBtn').onclick = saveCurrentMelody;
-            document.getElementById('imageBtn').onclick = exportToJPG;
-            document.getElementById('downloadColorsBtn').onclick = downloadColorScale;
+            document.getElementById('imageBtn').onclick = herunterladen;
 
             renderFolder();
         }
@@ -465,7 +461,6 @@
             beatEl.style.background = `linear-gradient(90deg, ${c1} 50%, ${c2} 50%)`;
             beatEl.style.border = "2px dashed #555";
             
-            // Ya no pintamos la corchea, solo la flecha si es C2
             const text1 = n1 ? (n1.id === 'C2' ? '⬆' : '') : '';
             const text2 = n2 ? (n2.id === 'C2' ? '⬆' : '') : '';
             
@@ -485,7 +480,6 @@
             const currentNote1 = beatEl.dataset.noteIndex;
             const currentNote2 = beatEl.dataset.noteIndex2;
 
-            // Detectar en qué mitad del círculo se hizo clic
             let isLeft = true;
             if (event && event.clientX) {
                 const rect = beatEl.getBoundingClientRect();
@@ -494,14 +488,12 @@
 
             const spacesNeeded = selectedDuration < 1 ? 1 : selectedDuration;
 
-            // Verificar si hay espacio para notas largas
             if (index + spacesNeeded - 1 >= beats.length) {
                 if (selectedDuration === 4) alert("Für eine (Ganze Note) brauchst du 4 freie Kreise in einer Reihe!");
                 else if (selectedDuration === 2) alert("Für eine (Halbe Note) brauchst du 2 freie Kreise!");
                 return;
             }
 
-            // GESTIÓN DE CORCHEAS AISLADA (Para evitar que la propia celda se borre)
             if (selectedDuration === 0.5 && currentDur === 0.5) {
                 let newNote1 = currentNote1;
                 let newNote2 = currentNote2;
@@ -524,7 +516,6 @@
                 return; 
             } 
             
-            // Lógica para apagar nota entera
             if (selectedDuration !== 0.5 && currentDur === selectedDuration && currentNote1 === selectedNote.id) {
                 for(let i = 0; i < spacesNeeded; i++) {
                     resetBeatVisuals(beats[index + i]);
@@ -532,7 +523,6 @@
                 return;
             }
 
-            // Limpiar colisiones de espacios adyacentes para notas largas
             for(let i=0; i<beats.length; i++) {
                 let d = parseFloat(beats[i].dataset.duration) || 1;
                 let spaces = d < 1 ? 1 : d;
@@ -548,9 +538,7 @@
                 }
             }
 
-            // APLICAR NUEVA NOTA
             if (selectedDuration === 0.5) {
-                // Si estaba vacía o era larga, la convertimos
                 beatEl.dataset.noteIndex = selectedNote.id;
                 beatEl.dataset.noteIndex2 = selectedNote.id;
                 beatEl.dataset.duration = "0.5";
@@ -680,25 +668,18 @@
             playBtn.style.backgroundColor = '#4CAF50';
         }
 
-        function exportToJPG() {
+        function herunterladen() {
             const captureArea = document.getElementById('capture-area');
             const btn = document.getElementById('imageBtn');
             const originalText = btn.textContent;
             
-            btn.textContent = '⏳ Foto wird erstellt...';
+            btn.textContent = '⏳ Wird heruntergeladen...';
             
             const cloneContainer = captureArea.cloneNode(true);
-            
             cloneContainer.style.position = 'absolute';
             cloneContainer.style.left = '-9999px';
             cloneContainer.style.top = '-9999px';
             cloneContainer.style.width = 'max-content'; 
-            
-            const clonedGrid = cloneContainer.querySelector('.grid');
-            clonedGrid.style.display = 'grid';
-            clonedGrid.style.gridTemplateColumns = 'auto auto'; 
-            clonedGrid.style.gap = '20px'; 
-            clonedGrid.style.justifyContent = 'center';
             
             const controls = cloneContainer.querySelectorAll('.measure-controls');
             controls.forEach(ctrl => ctrl.style.display = 'none');
@@ -710,7 +691,7 @@
                 backgroundColor: "#f0f8ff"
             }).then(canvas => {
                 const link = document.createElement('a');
-                link.download = 'Mein_Gitter.jpg';
+                link.download = 'Meine_Melodie.jpg';
                 link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
                 
@@ -719,68 +700,6 @@
             }).catch(err => {
                 alert("Beim Erstellen des Bildes ist ein Fehler aufgetreten.");
                 if (document.body.contains(cloneContainer)) document.body.removeChild(cloneContainer);
-                btn.textContent = originalText;
-            });
-        }
-
-        function downloadColorScale() { 
-            const btn = document.getElementById('downloadColorsBtn');
-            const originalText = btn.textContent;
-            btn.textContent = '⏳ Wird erstellt...';
-
-            const container = document.createElement('div');
-            container.style.position = 'absolute';
-            container.style.left = '-9999px';
-            container.style.backgroundColor = '#fffacd';
-            container.style.padding = '25px';
-            container.style.borderRadius = '15px';
-            container.style.display = 'flex';
-            container.style.flexWrap = 'wrap';
-            container.style.justifyContent = 'center';
-            container.style.gap = '15px';
-            container.style.width = '340px'; 
-            container.style.border = '3px solid #ffe066';
-            container.style.fontFamily = "'Comic Sans MS', sans-serif";
-
-            const title = document.createElement('h2');
-            title.textContent = '🎨 Meine Farbskala 🎵';
-            title.style.width = '100%';
-            title.style.textAlign = 'center';
-            title.style.color = '#d4a017';
-            title.style.margin = '0 0 15px 0';
-            container.appendChild(title);
-
-            notes.forEach(note => {
-                const circle = document.createElement('div');
-                circle.style.width = '60px';
-                circle.style.height = '60px';
-                circle.style.borderRadius = '50%';
-                circle.style.backgroundColor = note.color;
-                circle.style.display = 'flex';
-                circle.style.alignItems = 'center';
-                circle.style.justifyContent = 'center';
-                circle.style.fontWeight = 'bold';
-                circle.style.fontSize = '20px';
-                circle.style.color = 'rgba(0,0,0,0.5)';
-                circle.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                
-                circle.textContent = note.id === 'C2' ? 'C ⬆' : note.name;
-                
-                container.appendChild(circle);
-            });
-
-            document.body.appendChild(container);
-
-            html2canvas(container, { scale: 2 }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = 'Farbskala.jpg';
-                link.href = canvas.toDataURL('image/jpeg', 0.9);
-                link.click();
-                document.body.removeChild(container);
-                btn.textContent = originalText;
-            }).catch(err => {
-                alert("Fehler beim Erstellen der Farben.");
-                if(document.body.contains(container)) document.body.removeChild(container);
                 btn.textContent = originalText;
             });
         }
@@ -796,7 +715,6 @@
                 });
             });
 
-            // Evitar guardar si está todo vacío
             if (currentPattern.every(note => note.id === "null" && (note.id2 === "null" || note.id2 === undefined))) {
                 alert("Das Raster ist leer. Zeichne zuerst ein paar Noten!");
                 return;
