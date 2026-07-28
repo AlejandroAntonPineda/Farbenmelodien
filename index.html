@@ -144,15 +144,12 @@
             border-radius: 25px;
             box-shadow: var(--shadow-lg);
             margin-bottom: 30px;
-            max-width: 100%; /* Adaptación móvil */
-            overflow-x: auto; /* Adaptación móvil */
         }
         .grid {
             display: flex;
             flex-direction: column;
             gap: 15px;
             align-items: center;
-            min-width: max-content;
         }
         .measure {
             display: flex;
@@ -354,11 +351,13 @@
         </div>
 
         <div class="controls-wrapper">
+            <!-- Grupo 1: Controles de reproducción -->
             <div class="btn-group">
                 <button class="action-btn play-btn" id="playBtn">▶️ Play</button>
                 <button class="action-btn clear-btn" id="clearBtn">🧹 Alles löschen</button>
             </div>
             
+            <!-- Grupo 2: Opciones de guardado y archivos -->
             <div class="btn-group">
                 <button class="action-btn save-btn" id="saveBtn">💾 Im Ordner speichern</button>
                 <button class="action-btn image-btn" id="imageBtn">📥 Herunterladen</button>
@@ -446,20 +445,33 @@
 
         function setBeatsPerMeasure(newBeats) {
             if (beatsPerMeasure === newBeats) return;
-            
-            // Prevención de bugs visuales: Si cambian el ritmo, reiniciamos el lienzo de forma segura.
-            if (confirm("Achtung: Wenn du den Rhythmus änderst, wird dein aktuelles Lied gelöscht. Fortfahren?")) {
-                beatsPerMeasure = newBeats;
+            const oldBeats = beatsPerMeasure;
+            beatsPerMeasure = newBeats;
 
-                document.getElementById('btn3Beats').classList.toggle('active', newBeats === 3);
-                document.getElementById('btn4Beats').classList.toggle('active', newBeats === 4);
+            document.getElementById('btn3Beats').classList.toggle('active', newBeats === 3);
+            document.getElementById('btn4Beats').classList.toggle('active', newBeats === 4);
 
-                const gridEl = document.getElementById('grid');
-                gridEl.innerHTML = '';
-                for (let i = 0; i < 4; i++) {
-                    gridEl.appendChild(createMeasure());
+            const measures = document.querySelectorAll('.measure');
+            measures.forEach(measure => {
+                const controls = measure.querySelector('.measure-controls');
+                const beats = measure.querySelectorAll('.beat');
+                
+                if (newBeats === 3 && oldBeats === 4) {
+                    if (beats.length === 4) {
+                        if (parseFloat(beats[0].dataset.duration) === 4) {
+                            beats.forEach(b => resetBeatVisuals(b));
+                        }
+                        else if (parseFloat(beats[2].dataset.duration) === 2) {
+                            resetBeatVisuals(beats[2]);
+                            resetBeatVisuals(beats[3]);
+                        }
+                        beats[3].remove();
+                    }
+                } else if (newBeats === 4 && oldBeats === 3) {
+                    const beatEl = createBeatElement();
+                    measure.insertBefore(beatEl, controls);
                 }
-            }
+            });
         }
 
         function createBeatElement() {
@@ -517,7 +529,7 @@
             beat.dataset.noteIndex = "null";
             beat.dataset.noteIndex2 = "null";
             beat.dataset.duration = "1";
-            beat.style.background = ''; 
+            beat.style.background = ''; // Allow CSS background to take over
             beat.style.border = "";
             beat.style.width = ""; 
             beat.style.borderRadius = "";
@@ -670,24 +682,21 @@
                 const gain = audioCtx.createGain();
                 osc.type = type;
                 osc.frequency.setValueAtTime(f, now);
-                
                 gain.gain.setValueAtTime(0, now);
                 gain.gain.linearRampToValueAtTime(vol, now + attack);
-                
-                gain.gain.setTargetAtTime(0, now + dur - 0.05, decay / 4); 
-
+                gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start(now);
-                osc.stop(now + dur + 0.5); 
+                osc.stop(now + dur);
             };
 
             if (currentInstrument === 'piano') {
-                createOsc(frequency, 0.5, 'triangle', 0.02, 0.4);
-                createOsc(frequency * 2, 0.1, 'sine', 0.02, 0.3);
+                createOsc(frequency, 0.5, 'triangle', 0.01, 0.3);
+                createOsc(frequency * 2, 0.1, 'sine', 0.01, 0.2);
             } else {
-                createOsc(frequency, 0.4, 'sine', 0.01, 0.8);
-                createOsc(frequency * 4, 0.15, 'sine', 0.01, 0.5);
+                createOsc(frequency, 0.4, 'sine', 0.02, 0.8);
+                createOsc(frequency * 4, 0.15, 'sine', 0.01, 0.4);
             }
         }
 
@@ -748,19 +757,6 @@
         }
 
         function herunterladen() {
-            // 1. Preguntar por el nombre de la melodía
-            let inputName = prompt("Wie soll deine Melodie auf dem Bild heißen?", "Meine Melodie");
-            
-            // Si el usuario le da a "Cancelar", abortamos la descarga
-            if (inputName === null) {
-                return;
-            }
-            
-            // Si lo deja en blanco, usamos el valor por defecto
-            if (inputName.trim() === "") {
-                inputName = "Meine Melodie";
-            }
-
             const captureArea = document.getElementById('capture-area');
             const btn = document.getElementById('imageBtn');
             const originalText = btn.innerHTML;
@@ -771,29 +767,15 @@
             cloneContainer.style.position = 'absolute';
             cloneContainer.style.left = '-9999px';
             cloneContainer.style.top = '-9999px';
-            cloneContainer.style.width = 'auto'; 
-            cloneContainer.style.backgroundColor = '#ffffff'; 
-            cloneContainer.style.padding = '40px 50px'; 
-            cloneContainer.style.boxShadow = 'none'; 
-            cloneContainer.style.borderRadius = '0';
+            cloneContainer.style.width = 'max-content'; 
+            cloneContainer.style.backgroundColor = '#ffffff'; // White background for clean image
             
             const clonedGrid = cloneContainer.querySelector('.grid');
             clonedGrid.style.display = 'grid';
-            clonedGrid.style.gridTemplateColumns = 'repeat(2, max-content)'; 
-            clonedGrid.style.gap = '30px 50px'; 
+            clonedGrid.style.gridTemplateColumns = 'auto auto'; 
+            clonedGrid.style.gap = '20px'; 
             clonedGrid.style.justifyContent = 'center';
-            clonedGrid.style.alignItems = 'center';
             
-            // 2. Añadir el título personalizado a la foto
-            const imgTitle = document.createElement('h2');
-            imgTitle.innerText = `🎵 ${inputName} 🎵`;
-            imgTitle.style.gridColumn = "1 / -1";
-            imgTitle.style.textAlign = "center";
-            imgTitle.style.color = "#334155";
-            imgTitle.style.fontSize = "32px";
-            imgTitle.style.margin = "0 0 20px 0";
-            clonedGrid.insertBefore(imgTitle, clonedGrid.firstChild);
-
             const controls = cloneContainer.querySelectorAll('.measure-controls');
             controls.forEach(ctrl => ctrl.style.display = 'none');
 
@@ -801,18 +783,10 @@
             
             html2canvas(cloneContainer, {
                 scale: 2,
-                backgroundColor: "#ffffff",
-                windowWidth: cloneContainer.scrollWidth,
-                windowHeight: cloneContainer.scrollHeight
+                backgroundColor: "#ffffff"
             }).then(canvas => {
                 const link = document.createElement('a');
-                
-                // 3. Ponerle el nombre elegido al archivo .jpg
-                // Usamos un Regex para limpiar caracteres raros por seguridad (opcional, pero recomendado)
-                let safeFileName = inputName.replace(/[^a-zA-Z0-9äöüßÄÖÜ ]/g, "").trim();
-                if(safeFileName === "") safeFileName = "Melodie"; // Fallback por si escriben puros símbolos
-                
-                link.download = safeFileName + '.jpg';
+                link.download = 'Meine_Melodie.jpg';
                 link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
                 
@@ -883,10 +857,7 @@
             if (isPlaying) togglePlay(); 
             
             const targetBeats = melodyToLoad.beats || 4;
-            // Bypass the confirm dialog when loading a file
-            beatsPerMeasure = targetBeats;
-            document.getElementById('btn3Beats').classList.toggle('active', targetBeats === 3);
-            document.getElementById('btn4Beats').classList.toggle('active', targetBeats === 4);
+            setBeatsPerMeasure(targetBeats);
 
             const requiredMeasures = Math.ceil(melodyToLoad.pattern.length / targetBeats);
 
