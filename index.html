@@ -285,7 +285,7 @@
         <button class="action-btn clear-btn" id="clearBtn">🧹 Alles löschen</button>
         <br><br>
         <button class="action-btn save-btn" id="saveBtn">💾 In Ordner speichern</button>
-        <button class="action-btn image-btn" id="imageBtn">📥 Herunterladen</button>
+        <button class="action-btn image-btn" id="imageBtn">📥 Herunterladen (2 Spalten)</button>
     </div>
 
     <div class="folder-container">
@@ -680,6 +680,13 @@
             cloneContainer.style.left = '-9999px';
             cloneContainer.style.top = '-9999px';
             cloneContainer.style.width = 'max-content'; 
+            
+            // Re-añadiendo la lógica de las dos columnas para la foto
+            const clonedGrid = cloneContainer.querySelector('.grid');
+            clonedGrid.style.display = 'grid';
+            clonedGrid.style.gridTemplateColumns = 'auto auto'; 
+            clonedGrid.style.gap = '20px'; 
+            clonedGrid.style.justifyContent = 'center';
             
             const controls = cloneContainer.querySelectorAll('.measure-controls');
             controls.forEach(ctrl => ctrl.style.display = 'none');
