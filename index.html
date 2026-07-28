@@ -351,13 +351,11 @@
         </div>
 
         <div class="controls-wrapper">
-            <!-- Grupo 1: Controles de reproducción -->
             <div class="btn-group">
                 <button class="action-btn play-btn" id="playBtn">▶️ Play</button>
                 <button class="action-btn clear-btn" id="clearBtn">🧹 Alles löschen</button>
             </div>
             
-            <!-- Grupo 2: Opciones de guardado y archivos -->
             <div class="btn-group">
                 <button class="action-btn save-btn" id="saveBtn">💾 Im Ordner speichern</button>
                 <button class="action-btn image-btn" id="imageBtn">📥 Herunterladen</button>
@@ -529,7 +527,7 @@
             beat.dataset.noteIndex = "null";
             beat.dataset.noteIndex2 = "null";
             beat.dataset.duration = "1";
-            beat.style.background = ''; // Allow CSS background to take over
+            beat.style.background = ''; 
             beat.style.border = "";
             beat.style.width = ""; 
             beat.style.borderRadius = "";
@@ -763,27 +761,39 @@
             
             btn.innerHTML = '⏳ Wird heruntergeladen...';
             
+            // Clonamos el contenedor original
             const cloneContainer = captureArea.cloneNode(true);
+            
+            // Configuración estricta para forzar las 2 columnas en el clon
             cloneContainer.style.position = 'absolute';
             cloneContainer.style.left = '-9999px';
             cloneContainer.style.top = '-9999px';
-            cloneContainer.style.width = 'max-content'; 
-            cloneContainer.style.backgroundColor = '#ffffff'; // White background for clean image
+            cloneContainer.style.width = 'auto'; // Auto para que el grid dicte el ancho
+            cloneContainer.style.backgroundColor = '#ffffff'; // Fondo limpio
+            cloneContainer.style.padding = '40px'; 
+            cloneContainer.style.boxShadow = 'none'; 
+            cloneContainer.style.borderRadius = '0';
             
             const clonedGrid = cloneContainer.querySelector('.grid');
             clonedGrid.style.display = 'grid';
-            clonedGrid.style.gridTemplateColumns = 'auto auto'; 
-            clonedGrid.style.gap = '20px'; 
+            // Garantiza 2 columnas distribuidas proporcionalmente sin romper el formato
+            clonedGrid.style.gridTemplateColumns = 'repeat(2, max-content)'; 
+            clonedGrid.style.gap = '30px 40px'; 
             clonedGrid.style.justifyContent = 'center';
+            clonedGrid.style.alignItems = 'center';
             
+            // Ocultamos los botones de control de filas (+ y -) en la foto
             const controls = cloneContainer.querySelectorAll('.measure-controls');
             controls.forEach(ctrl => ctrl.style.display = 'none');
 
             document.body.appendChild(cloneContainer);
             
+            // Capturamos asegurando que la librería toma las medidas completas del grid en 2 columnas
             html2canvas(cloneContainer, {
                 scale: 2,
-                backgroundColor: "#ffffff"
+                backgroundColor: "#ffffff",
+                windowWidth: cloneContainer.scrollWidth,
+                windowHeight: cloneContainer.scrollHeight
             }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = 'Meine_Melodie.jpg';
