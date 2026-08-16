@@ -375,6 +375,9 @@
     </div>
 
     <script>
+        // ==========================================
+        // 1. VARIABLES GLOBALES Y CONFIGURACIÓN
+        // ==========================================
         const notes = [
             { id: 'C', name: 'C', color: '#ff3333', freq: 261.63 },
             { id: 'D', name: 'D', color: '#ff8c00', freq: 293.66 },
@@ -398,11 +401,16 @@
         
         let savedMelodies = [];
 
+        // ==========================================
+        // 2. INICIALIZACIÓN
+        // ==========================================
         function init() {
-            const paletteEl = document.getElementById('palette');
+            // Cargar melodías de localStorage
             const storedMelodies = localStorage.getItem('meineMelodien');
             if (storedMelodies) savedMelodies = JSON.parse(storedMelodies);
 
+            // Generar paleta de colores
+            const paletteEl = document.getElementById('palette');
             notes.forEach(note => {
                 const btn = document.createElement('div');
                 btn.className = 'note-btn' + (note.id === selectedNote.id ? ' selected' : '');
@@ -412,11 +420,13 @@
                 paletteEl.appendChild(btn);
             });
 
+            // Generar cuadrícula inicial
             const gridEl = document.getElementById('grid');
             for (let i = 0; i < 4; i++) {
                 gridEl.appendChild(createMeasure());
             }
 
+            // Asignar eventos a los botones principales
             document.getElementById('playBtn').onclick = togglePlay;
             document.getElementById('clearBtn').onclick = clearGrid;
             document.getElementById('saveBtn').onclick = saveCurrentMelody;
@@ -426,7 +436,18 @@
             document.getElementById('importBtn').onclick = () => document.getElementById('fileInput').click();
             document.getElementById('fileInput').addEventListener('change', importFromFile);
 
+            // Renderizar la carpeta
             renderFolder();
+        }
+
+        // ==========================================
+        // 3. CONTROLES DE LA INTERFAZ
+        // ==========================================
+        function selectNote(note, element) {
+            selectedNote = note;
+            document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('selected'));
+            element.classList.add('selected');
+            playSound(note.freq, 1);
         }
 
         function setInstrument(type) {
@@ -474,16 +495,9 @@
             });
         }
 
-        function createBeatElement() {
-            const beatEl = document.createElement('div');
-            beatEl.className = 'beat';
-            beatEl.dataset.noteIndex = "null";
-            beatEl.dataset.noteIndex2 = "null";
-            beatEl.dataset.duration = "1";
-            beatEl.onclick = (e) => toggleBeat(beatEl, e);
-            return beatEl;
-        }
-
+        // ==========================================
+        // 4. LÓGICA DE LA CUADRÍCULA (GRID)
+        // ==========================================
         function createMeasure() {
             const measureEl = document.createElement('div');
             measureEl.className = 'measure';
@@ -518,18 +532,21 @@
             return measureEl;
         }
 
-        function selectNote(note, element) {
-            selectedNote = note;
-            document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('selected'));
-            element.classList.add('selected');
-            playSound(note.freq, 1);
+        function createBeatElement() {
+            const beatEl = document.createElement('div');
+            beatEl.className = 'beat';
+            beatEl.dataset.noteIndex = "null";
+            beatEl.dataset.noteIndex2 = "null";
+            beatEl.dataset.duration = "1";
+            beatEl.onclick = (e) => toggleBeat(beatEl, e);
+            return beatEl;
         }
 
         function resetBeatVisuals(beat) {
             beat.dataset.noteIndex = "null";
             beat.dataset.noteIndex2 = "null";
             beat.dataset.duration = "1";
-            beat.style.background = ''; // Allow CSS background to take over
+            beat.style.background = ''; 
             beat.style.border = "";
             beat.style.width = ""; 
             beat.style.borderRadius = "";
@@ -580,6 +597,7 @@
                 return;
             }
 
+            // Lógica para mezclar corcheas
             if (selectedDuration === 0.5 && currentDur === 0.5) {
                 let newNote1 = currentNote1;
                 let newNote2 = currentNote2;
@@ -602,6 +620,7 @@
                 return; 
             } 
             
+            // Borrar nota existente si se hace clic otra vez en la misma
             if (selectedDuration !== 0.5 && currentDur === selectedDuration && currentNote1 === selectedNote.id) {
                 for(let i = 0; i < spacesNeeded; i++) {
                     resetBeatVisuals(beats[index + i]);
@@ -609,6 +628,7 @@
                 return;
             }
 
+            // Limpiar celdas previas ocupadas
             for(let i=0; i<beats.length; i++) {
                 let d = parseFloat(beats[i].dataset.duration) || 1;
                 let spaces = d < 1 ? 1 : d;
@@ -624,6 +644,7 @@
                 }
             }
 
+            // Aplicar nueva nota
             if (selectedDuration === 0.5) {
                 beatEl.dataset.noteIndex = selectedNote.id;
                 beatEl.dataset.noteIndex2 = selectedNote.id;
@@ -670,6 +691,67 @@
             if (isPlaying) togglePlay(); 
         }
 
+        function applyMelodyToGrid(melodyToLoad) {
+            if (isPlaying) togglePlay(); 
+            
+            const targetBeats = melodyToLoad.beats || 4;
+            setBeatsPerMeasure(targetBeats);
+
+            const requiredMeasures = Math.ceil(melodyToLoad.pattern.length / targetBeats);
+
+            const gridEl = document.getElementById('grid');
+            gridEl.innerHTML = ''; 
+            
+            for (let i = 0; i < requiredMeasures; i++) {
+                gridEl.appendChild(createMeasure());
+            }
+
+            const beats = document.querySelectorAll('.beat');
+            beats.forEach((beat, i) => {
+                if (i < melodyToLoad.pattern.length) {
+                    const noteData = melodyToLoad.pattern[i];
+                    
+                    const noteId = typeof noteData === 'string' ? noteData : noteData.id;
+                    const noteId2 = typeof noteData === 'string' ? noteData : (noteData.id2 || "null");
+                    const dur = typeof noteData === 'string' ? 1 : parseFloat(noteData.dur);
+
+                    beat.dataset.noteIndex = noteId;
+                    beat.dataset.noteIndex2 = noteId2;
+                    beat.dataset.duration = dur;
+
+                    if (noteId === "tie") {
+                        beat.style.display = "none";
+                    } else if (dur === 0.5) {
+                        updateCorcheaVisuals(beat);
+                    } else if (noteId !== "null") {
+                        const note = notes.find(n => n.id === noteId);
+                        if(note) {
+                            beat.style.background = note.color;
+                            beat.innerHTML = noteId === 'C2' ? '⬆' : '';
+                            beat.style.color = "rgba(0,0,0,0.6)";
+
+                            if (dur === 4) {
+                                beat.style.width = "316px";
+                                beat.style.borderRadius = "35px";
+                                beat.style.border = "2px solid rgba(0,0,0,0.3)";
+                            } else if (dur === 2) {
+                                beat.style.width = "152px";
+                                beat.style.borderRadius = "35px";
+                                beat.style.border = "2px solid rgba(0,0,0,0.3)";
+                            } else {
+                                beat.style.border = "2px solid rgba(0,0,0,0.1)";
+                            }
+                        }
+                    } else {
+                        resetBeatVisuals(beat);
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // 5. MOTOR DE AUDIO Y REPRODUCCIÓN
+        // ==========================================
         function playSound(frequency, durationBeats = 1) {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -756,6 +838,9 @@
             playBtn.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
         }
 
+        // ==========================================
+        // 6. ARCHIVOS: DESCARGAR IMAGEN E IMPORTAR/EXPORTAR
+        // ==========================================
         function herunterladen() {
             const captureArea = document.getElementById('capture-area');
             const btn = document.getElementById('imageBtn');
@@ -768,7 +853,7 @@
             cloneContainer.style.left = '-9999px';
             cloneContainer.style.top = '-9999px';
             cloneContainer.style.width = 'max-content'; 
-            cloneContainer.style.backgroundColor = '#ffffff'; // White background for clean image
+            cloneContainer.style.backgroundColor = '#ffffff';
             
             const clonedGrid = cloneContainer.querySelector('.grid');
             clonedGrid.style.display = 'grid';
@@ -792,6 +877,10 @@
                 
                 document.body.removeChild(cloneContainer);
                 btn.innerHTML = originalText;
+                
+                // --- MENSAJE DE CONFIRMACIÓN AÑADIDO ---
+                setTimeout(() => alert("Erfolgreich als Bild heruntergeladen! 🎨"), 150);
+                
             }).catch(err => {
                 alert("Beim Erstellen des Bildes ist ein Fehler aufgetreten.");
                 if (document.body.contains(cloneContainer)) document.body.removeChild(cloneContainer);
@@ -830,6 +919,9 @@
             a.click();
             
             URL.revokeObjectURL(url);
+            
+            // --- MENSAJE DE CONFIRMACIÓN AÑADIDO ---
+            setTimeout(() => alert("Melodie-Datei erfolgreich heruntergeladen! 📁"), 150);
         }
 
         function importFromFile(event) {
@@ -853,64 +945,9 @@
             event.target.value = ''; 
         }
 
-        function applyMelodyToGrid(melodyToLoad) {
-            if (isPlaying) togglePlay(); 
-            
-            const targetBeats = melodyToLoad.beats || 4;
-            setBeatsPerMeasure(targetBeats);
-
-            const requiredMeasures = Math.ceil(melodyToLoad.pattern.length / targetBeats);
-
-            const gridEl = document.getElementById('grid');
-            gridEl.innerHTML = ''; 
-            
-            for (let i = 0; i < requiredMeasures; i++) {
-                gridEl.appendChild(createMeasure());
-            }
-
-            const beats = document.querySelectorAll('.beat');
-            beats.forEach((beat, i) => {
-                if (i < melodyToLoad.pattern.length) {
-                    const noteData = melodyToLoad.pattern[i];
-                    
-                    const noteId = typeof noteData === 'string' ? noteData : noteData.id;
-                    const noteId2 = typeof noteData === 'string' ? noteData : (noteData.id2 || "null");
-                    const dur = typeof noteData === 'string' ? 1 : parseFloat(noteData.dur);
-
-                    beat.dataset.noteIndex = noteId;
-                    beat.dataset.noteIndex2 = noteId2;
-                    beat.dataset.duration = dur;
-
-                    if (noteId === "tie") {
-                        beat.style.display = "none";
-                    } else if (dur === 0.5) {
-                        updateCorcheaVisuals(beat);
-                    } else if (noteId !== "null") {
-                        const note = notes.find(n => n.id === noteId);
-                        if(note) {
-                            beat.style.background = note.color;
-                            beat.innerHTML = noteId === 'C2' ? '⬆' : '';
-                            beat.style.color = "rgba(0,0,0,0.6)";
-
-                            if (dur === 4) {
-                                beat.style.width = "316px";
-                                beat.style.borderRadius = "35px";
-                                beat.style.border = "2px solid rgba(0,0,0,0.3)";
-                            } else if (dur === 2) {
-                                beat.style.width = "152px";
-                                beat.style.borderRadius = "35px";
-                                beat.style.border = "2px solid rgba(0,0,0,0.3)";
-                            } else {
-                                beat.style.border = "2px solid rgba(0,0,0,0.1)";
-                            }
-                        }
-                    } else {
-                        resetBeatVisuals(beat);
-                    }
-                }
-            });
-        }
-
+        // ==========================================
+        // 7. CARPETA LOCAL (GUARDADO EN NAVEGADOR)
+        // ==========================================
         function saveCurrentMelody() {
             const beats = document.querySelectorAll('.beat');
             let currentPattern = [];
@@ -940,6 +977,9 @@
             });
             localStorage.setItem('meineMelodien', JSON.stringify(savedMelodies));
             renderFolder();
+            
+            // --- MENSAJE DE CONFIRMACIÓN AÑADIDO ---
+            alert("Melodie erfolgreich im Ordner gespeichert! 💾");
         }
 
         function renderFolder() {
